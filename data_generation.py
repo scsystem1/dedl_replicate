@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 import config
-from utils import powerset  # 假设下一文件 utils.py 中会实现此函数
+from utils import powerset
 
 
 def generate_x(d_c, n):

@@ -8,7 +8,7 @@ import seaborn as sns
 
 # 导入自定义模块
 import config
-from utils import FNN_asig, calculate_mse
+from utils import FNN_asig, calculate_mse, plot_figure7
 from data_generation import get_data, generate_x, generate_t, generate_y_true
 from dedl import calculate_ate
 
@@ -31,62 +31,6 @@ def train_model(net, train_loader, optimizer, criterion):
 
         loss.backward()
         optimizer.step()
-
-
-def plot_figure7(history, save_path="Figure7_Replication.pdf"):
-    """
-    绘制并保存复现的 Figure 7
-    """
-    epochs = history['epoch']
-    mse = history['train_mse']
-
-    # 转换为百分比
-    sdl_mape = np.array(history['mape_sdl']) * 100
-    dedl_mape = np.array(history['mape_dedl']) * 100
-    lr_mape = np.array(history['mape_lr']) * 100
-
-    # 设置绘图风格 (复刻论文风格)
-    sns.set_theme(style="whitegrid",
-                  font="Times New Roman" if "Times New Roman" in plt.rcParams['font.family'] else "sans-serif")
-    fig, ax1 = plt.subplots(figsize=(12, 6))
-
-    # 左轴: Training MSE (红色)
-    color_mse = 'tab:red'
-    ax1.set_xlabel('Training Epoch', fontsize=14)
-    ax1.set_ylabel('Training MSE', color=color_mse, fontsize=14)
-    line1, = ax1.plot(epochs, mse, color=color_mse, marker='.', markersize=4, linestyle='-', label='Training MSE',
-                      alpha=0.6)
-    ax1.tick_params(axis='y', labelcolor=color_mse)
-    ax1.set_ylim(bottom=0)
-    ax1.grid(False)  # 关闭左轴网格，避免混乱
-
-    # 右轴: Estimation MAPE (蓝色/绿色/虚线等)
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Estimation MAPE (%)', color='black', fontsize=14)
-
-    # 绘制三条 MAPE 线
-    line2, = ax2.plot(epochs, dedl_mape, color='navy', linestyle='-', linewidth=2, label='DeDL MAPE')
-    line3, = ax2.plot(epochs, sdl_mape, color='gray', linestyle='--', linewidth=2, label='SDL MAPE')
-    line4, = ax2.plot(epochs, lr_mape, color='gray', linestyle=':', linewidth=2, alpha=0.8, label='LR MAPE')
-
-    ax2.tick_params(axis='y', labelcolor='black')
-    # 设置右轴范围，确保能看清 DeDL 的下降趋势 (参考 Figure 7)
-    # 通常 MAPE 在 0% 到 100% 之间，或者根据数据自适应
-    top_lim = max(np.max(sdl_mape), np.max(dedl_mape), np.max(lr_mape)) * 1.2
-    ax2.set_ylim(0, top_lim)
-
-    # 合并图例
-    lines = [line1, line2, line3, line4]
-    labels = [l.get_label() for l in lines]
-    ax1.legend(lines, labels, loc='upper right', frameon=True, fontsize=12)
-
-    plt.title('Replication of Figure 7: MAPE Comparison with DNN Training Epoch', fontsize=16, pad=20)
-    plt.tight_layout()
-
-    # 保存为 PDF
-    plt.savefig(save_path, format='pdf', bbox_inches='tight')
-    print(f"Figure saved to {save_path}")
-    plt.show()
 
 
 def main():
@@ -134,27 +78,25 @@ def main():
     for epoch in range(config.epochs):
         # 训练一步
         train_model(net, train_loader, optimizer, criterion)
-
-        # 计算 Training MSE
-        train_mse = calculate_mse(train_loader, net)
-
-        # 计算 MAPE (DeDL, SDL, LR)
-        # 这里的计算比较耗时，但为了绘制平滑的曲线，我们在每一轮都计算
-        # 传入 x_est, t_est, y_est 作为 "观测到的评估集"
-        # 传入 data_info['t_combo'] 作为所有需要预测的 Treatment 组合
-        mape_sdl, mape_dedl, mape_lr = calculate_ate(
-            net, x_est, t_est, y_est, data_info['t_combo'], data_info
-        )
-
-        # 记录数据
-        history['epoch'].append(epoch)
-        history['train_mse'].append(train_mse)
-        history['mape_sdl'].append(mape_sdl)
-        history['mape_dedl'].append(mape_dedl)
-        history['mape_lr'].append(mape_lr)
-
-        # 打印进度 (每 10 epoch)
         if epoch % 10 == 0 or epoch == config.epochs - 1:
+            # 计算 Training MSE
+            train_mse = calculate_mse(train_loader, net)
+
+            # 计算 MAPE (DeDL, SDL, LR)
+            # 这里的计算比较耗时，但为了绘制平滑的曲线，我们在每一轮都计算
+            # 传入 x_est, t_est, y_est 作为 "观测到的评估集"
+            # 传入 data_info['t_combo'] 作为所有需要预测的 Treatment 组合
+            mape_sdl, mape_dedl, mape_lr = calculate_ate(
+                net, x_est, t_est, y_est, data_info['t_combo'], data_info
+            )
+
+            # 记录数据
+            history['epoch'].append(epoch)
+            history['train_mse'].append(train_mse)
+            history['mape_sdl'].append(mape_sdl)
+            history['mape_dedl'].append(mape_dedl)
+            history['mape_lr'].append(mape_lr)
+
             print(f"Epoch {epoch:3d} | Train MSE: {train_mse:.4f} | "
                   f"MAPE - DeDL: {mape_dedl:.2%}, SDL: {mape_sdl:.2%}, LR: {mape_lr:.2%}")
 
