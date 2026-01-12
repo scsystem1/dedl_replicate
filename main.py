@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-# 导入自定义模块
 import config
 from utils import FNN_asig, calculate_mse, plot_figure7
 from data_generation import get_data, generate_x, generate_t, generate_y_true
@@ -58,7 +57,7 @@ def main():
     # Warm-up heuristic: 初始化 c 参数 (layer3 weight) 为 Outcome 的最大值附近
     # 这有助于 sigmoid 快速收敛到正确的量级
     with torch.no_grad():
-        net.layer3.weight[0, 0] = float(np.max(y_est))
+        net.layer3.weight[0, 0] = float(25.0)
 
     optimizer = optim.Adam(net.parameters(), lr=config.lr, weight_decay=config.wd)
     criterion = nn.MSELoss()

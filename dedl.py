@@ -23,9 +23,7 @@ def get_network_params(net, x_input):
     net.eval()
     with torch.no_grad():
         x_tensor = torch.Tensor(x_input).to(config.device)
-        # 获取 beta (即 notebook 中的 activation['layer1'])
         beta = net.layer1(x_tensor).cpu().numpy()
-        # 获取 c (即 notebook 中的 net.layer3.weight[0, 0])
         c_est = net.layer3.weight.data.cpu().numpy()[0, 0]
     return beta, c_est
 
@@ -48,11 +46,7 @@ def calculate_gradient(beta, c, t):
     sig_u = sigmoid(u)
 
     # 梯度计算，与 notebook 保持一致
-    # notebook: c_est*np.exp(-u_)/(np.exp(-u_)+1)**2*t_star_base
-    # 这等价于 c * sigmoid(u) * (1-sigmoid(u)) * t
     d_beta = c * np.exp(-u) / (np.exp(-u) + 1) ** 2 * t
-
-    # notebook: [1/(np.exp(-u_)+1)]
     d_c = np.array([sig_u])
 
     return np.concatenate((d_beta, d_c))
@@ -177,11 +171,6 @@ def calculate_ate(net, x_est, t_est, y_est, t_combo, params):
     import statsmodels.api as sm
 
     X_LR_train = np.hstack((x_est, t_est))
-    # add_constant? Notebook 中 generate_y 时包含了截距 d，但 LR 好像是直接 regress on features+t
-    # Notebook: model_LR = sm.OLS(samples_y_est..., np.append(samples_x_est, samples_t_est, axis=1))
-    # 它是没有显式 add_constant 的 (除非 x 中包含 constant col，但 generate_x 是 uniform(0,1))
-    # 不过 t[0] 始终是 1 (intercept bit)，所以其实隐含了 constant。
-
     model_LR = sm.OLS(y_est, X_LR_train).fit()
     coef_LR = model_LR.params
 
@@ -197,9 +186,7 @@ def calculate_ate(net, x_est, t_est, y_est, t_combo, params):
     # 基准 Treatment (全0，除了 intercept 位 t[0]=1)
     t_base = params['t_combo'][0]
 
-    # 1. 计算 Base Case 的估计值 (E[Y|T=t_base])
-    # 这一步在循环外做一次即可，但 notebook 是在循环里做的。
-    # 为了效率我们提取出来，但逻辑不变。
+    # 1. 计算 Base Case 的估计值
     base_sdl, base_dedl = get_debiased_prediction(net, x_est, t_est, y_est, t_base, params)
 
     # 计算 Base Case 的 LR 预测
@@ -208,7 +195,6 @@ def calculate_ate(net, x_est, t_est, y_est, t_combo, params):
 
     # 计算 Base Case 的 Ground Truth
     # generate_y_true 的逻辑: y = c / (1+exp(-((x.coef)**3).t))
-    # 注意这里不加噪声，算的是 E[Y]
     term_base = np.sum((np.dot(x_est, coef_true)) ** 3 * t_base, axis=1)
     y_true_base = np.mean(c_true / (1 + np.exp(-term_base)) + d_true)
 
